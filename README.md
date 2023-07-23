@@ -14,3 +14,5 @@ i nakon uspešnog logina otvara se glavna strana
 - Polje **Doktor** popunjava se podacima vezanim za logovanog korisnika.
 
 Nakon pritiska na "print", uneti podaci se pohranjuju u databazu, i otvara se print dijalog za štampanje izveštaja.
+
+U okviru paketa sadržana je i mala aplikacija koja radi u komandnoj liniji, namenjena za manipulisanje databaza.
