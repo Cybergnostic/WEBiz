@@ -7,6 +7,7 @@ WEBiz je namenjen primarno za korišćenje na LAN mrežama.
 Aplikacija podiže flask server koji renderuje web stranu. 
 Korisnik se loguje
 ![Alt Text](login.png)
+
 i nakon uspešnog logina otvara se glavna strana
 ![Alt Text](page.png)
 
