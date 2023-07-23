@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>WEBiz izveštaj</title>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+</head>
+<body>
+    <!-- Add the "Obriši sva polja" button at the top of the page -->
+    <button onclick="clearAllFields()">Obriši sva polja</button>
+
+    <form method="post" action="/save" id="saveForm" onsubmit="submitFormAndRedirect(); return false;">
+        <label for="patient_surname">Prezime:</label>
+        <input type="text" id="patient_surname" name="patient_surname" required>
+        <br>
+        <label for="patient_name">Ime:</label>
+        <input type="text" id="patient_name" name="patient_name" required>
+        <br>
+        <label for="patient_fathername">Ime oca:</label>
+        <input type="text" id="patient_fathername" name="patient_fathername">
+        <br>
+        <label for="patient_birthdate">Datum rođenja:</label>
+        <input type="date" id="patient_birthdate" name="patient_birthdate" required>
+        <br>
+        <label for="anamnesis">Anamneza:</label>
+        <textarea id="anamnesis" name="anamnesis" required></textarea>
+        <br>
+
+        <label for="diagnosis_search">Pretraga dijagnoza:</label>
+        <input type="text" id="diagnosis_search" name="diagnosis_search" hx-get="/get_suggestions?keyword={value}" hx-trigger="input">
+        <div id="diagnosis_suggestions"></div>
+        <label for="therapy">Terapija:</label>
+        <input type="text" id="therapy" name="therapy" required>
+        <br>
+        <br>
+        <input type="submit" value="Print">
+    </form>
+    <h5>Doktor:</h5>
+    {% if data %}
+        <p>{{ data[0] }} {{ data[1] }} {{ data[2] }}, {{ data[3] }}</p>
+    {% else %}
+        <p>No user data available</p>
+    {% endif %}
+    <!-- Logout Form -->
+    <form id="logoutForm" method="post" action="{{ url_for('logout') }}">
+        <input type="submit" value="Logout" onclick="return confirm('Are you sure you want to logout?');">
+    </form>
+    
+
+    <script>
+        let selectedIndex = -1;
+
+    // Function to send a logout request to the /logout route using the Fetch API
+    function logout() {
+        fetch("{{ url_for('logout') }}", { method: "POST" })
+            .then(() => {
+                // After successful logout, redirect the user to the login page
+                window.location.href = "{{ url_for('login_page') }}";
+            })
+            .catch((error) => {
+                console.error("Logout request failed:", error);
+            });
+    }
+
+    async function submitFormAndRedirect() {
+        // Save the data to the database using the form's action attribute
+        await fetch($("#saveForm").attr("action"), {
+            method: "POST",
+            body: new FormData(document.getElementById("saveForm"))
+        });
+    
+        // Trigger the print dialog
+        window.print();
+    
+        // Redirect to the main_index page after the form is submitted and printed
+        window.location.href = "{{ url_for('index') }}";
+    }
+
+    function clearAllFields() {
+        document.getElementById("patient_surname").value = "";
+        document.getElementById("patient_name").value = "";
+        document.getElementById("patient_fathername").value = "";
+        document.getElementById("patient_birthdate").value = "";
+        document.getElementById("anamnesis").value = "";
+        document.getElementById("diagnosis_search").value = "";
+        document.getElementById("therapy").value = "";
+        document.getElementById("diagnosis_suggestions").innerHTML = "";
+        selectedIndex = -1; // Reset the selectedIndex variable if needed
+    }
+
+    // Send logout request when the page is closed or connection is cut
+    window.addEventListener("unload", function () {
+        logout();
+    });
+
+
+    // Add event listener to the search box
+    document.getElementById("diagnosis_search").addEventListener("input", function() {
+        selectedIndex = -1; // Reset selected index when new input is typed
+        showSuggestions(this.value);
+    });
+
+    function showSuggestions(keyword) {
+        $.ajax({
+            type: "GET",
+            url: "/get_suggestions",
+            data: { keyword: keyword },
+            success: function(data) {
+                var suggestionsDiv = document.getElementById("diagnosis_suggestions");
+                suggestionsDiv.innerHTML = '';
+
+                data.forEach(function(item, index) {
+                    var suggestion = document.createElement('div');
+                    suggestion.textContent = item['Oznaka'] + ' - ' + item['Naziv dijagnoze'];
+                    suggestion.addEventListener('click', function() {
+                        document.getElementById('diagnosis_search').value = item['Oznaka'] + ' - ' + item['Naziv dijagnoze'];
+                        suggestionsDiv.innerHTML = '';
+                    });
+
+                    // Add keyboard navigation
+                    suggestion.addEventListener('mouseover', function() {
+                        selectedIndex = index;
+                        highlightSuggestion();
+                    });
+
+                    suggestionsDiv.appendChild(suggestion);
+                });
+            }
+        });
+    }
+
+    document.addEventListener('keydown', function(event) {
+        var suggestions = document.querySelectorAll("#diagnosis_suggestions div");
+        if (event.key === 'ArrowDown') {
+            selectedIndex = Math.min(selectedIndex + 1, suggestions.length - 1);
+            highlightSuggestion();
+        } else if (event.key === 'ArrowUp') {
+            selectedIndex = Math.max(selectedIndex - 1, -1);
+            highlightSuggestion();
+        } else if (event.key === 'Enter' && selectedIndex >= 0) {
+            var selectedSuggestion = suggestions[selectedIndex];
+            var selectedText = selectedSuggestion.textContent;
+            document.getElementById('diagnosis_search').value = selectedText;
+            document.getElementById('diagnosis_suggestions').innerHTML = '';
+            selectedIndex = -1;
+        }
+    });
+
+    function highlightSuggestion() {
+        var suggestions = document.querySelectorAll("#diagnosis_suggestions div");
+        suggestions.forEach(function(suggestion, index) {
+            if (index === selectedIndex) {
+                suggestion.classList.add('selected');
+            } else {
+                suggestion.classList.remove('selected');
+            }
+        });
+    }
+
+    document.getElementById("loginForm").addEventListener("submit", function(event) {
+        event.preventDefault();  // Prevent the default form submission
+
+        // Get the form data
+        const formData = new FormData(event.target);
+
+        // Get the password input field value and hash it using SHA256
+        const passwordInput = formData.get("password");
+        const hashedPassword = sha256(passwordInput);
+
+        // Replace the plain text password with the hashed password in the form data
+        formData.set("password", hashedPassword);
+
+        // Send the form data to the /login route using a fetch request
+        fetch("/login", {
+            method: "POST",
+            body: formData
+        })
+        .then(response => {
+            if (response.redirected) {
+                // If the login was successful, the server will redirect to the index page
+                window.location.href = response.url;
+            } else {
+                // If the login failed, show an error message (you can modify this part according to your needs)
+                alert("Login failed. Please check your username and password.");
+            }
+        })
+        .catch(error => {
+            console.error("Login request failed:", error);
+        });
+    });
+
+    // Helper function to hash the password using SHA256
+    function sha256(plainText) {
+        const encoder = new TextEncoder();
+        const data = encoder.encode(plainText);
+        return crypto.subtle.digest("SHA-256", data).then(buffer => {
+            return Array.from(new Uint8Array(buffer)).map(byte => {
+                return ("0" + byte.toString(16)).slice(-2);
+            }).join("");
+        });
+    }
+</script>
+
+    </script>
+    <style>
+        .selected {
+            background-color: #e6e6e6;
+        }
+    </style>
+</body>
+</html>

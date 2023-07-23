@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>WEBiz izveštaj</title>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+</head>
+<body>
+    <form method="post" action="/save">
+        <label for="patient_surname">Prezime:</label>
+        <input type="text" id="patient_surname" name="patient_surname" required>
+        <br>
+        <label for="patient_name">Ime:</label>
+        <input type="text" id="patient_name" name="patient_name" required>
+        <br>
+        <label for="patient_fathername">Ime oca:</label>
+        <input type="text" id="patient_fathername" name="patient_fathername">
+        <br>
+        <label for="patient_birthdate">Datum rođenja:</label>
+        <input type="date" id="patient_birthdate" name="patient_birthdate" required>
+        <br>
+        <label for="anamnesis">Anamneza:</label>
+        <textarea id="anamnesis" name="anamnesis" required></textarea>
+        <br>
+
+        <label for="diagnosis_search">Pretraga dijagnoza:</label>
+        <input type="text" id="diagnosis_search" name="diagnosis_search" hx-get="/get_suggestions?keyword={value}" hx-trigger="input">
+        <div id="diagnosis_suggestions"></div>
+        <br>
+        <input type="submit" value="Save">
+    </form>
+
+    <script>
+        let selectedIndex = -1;
+
+        // Add event listener to the search box
+        document.getElementById("diagnosis_search").addEventListener("input", function() {
+            selectedIndex = -1; // Reset selected index when new input is typed
+            showSuggestions(this.value);
+        });
+
+        function showSuggestions(keyword) {
+            $.ajax({
+                type: "GET",
+                url: "/get_suggestions",
+                data: { keyword: keyword },
+                success: function(data) {
+                    var suggestionsDiv = document.getElementById("diagnosis_suggestions");
+                    suggestionsDiv.innerHTML = '';
+
+                    data.forEach(function(item, index) {
+                        var suggestion = document.createElement('div');
+                        suggestion.textContent = item['Oznaka'] + ' - ' + item['Naziv dijagnoze'];
+                        suggestion.addEventListener('click', function() {
+                            document.getElementById('diagnosis_search').value = item['Oznaka'] + ' - ' + item['Naziv dijagnoze'];
+                            suggestionsDiv.innerHTML = '';
+                        });
+
+                        // Add keyboard navigation
+                        suggestion.addEventListener('mouseover', function() {
+                            selectedIndex = index;
+                            highlightSuggestion();
+                        });
+
+                        suggestionsDiv.appendChild(suggestion);
+                    });
+                }
+            });
+        }
+
+        document.addEventListener('keydown', function(event) {
+            var suggestions = document.querySelectorAll("#diagnosis_suggestions div");
+            if (event.key === 'ArrowDown') {
+                selectedIndex = Math.min(selectedIndex + 1, suggestions.length - 1);
+                highlightSuggestion();
+            } else if (event.key === 'ArrowUp') {
+                selectedIndex = Math.max(selectedIndex - 1, -1);
+                highlightSuggestion();
+            } else if (event.key === 'Enter' && selectedIndex >= 0) {
+                var selectedSuggestion = suggestions[selectedIndex];
+                var selectedText = selectedSuggestion.textContent;
+                document.getElementById('diagnosis_search').value = selectedText;
+                document.getElementById('diagnosis_suggestions').innerHTML = '';
+                selectedIndex = -1;
+            }
+        });
+
+        function highlightSuggestion() {
+            var suggestions = document.querySelectorAll("#diagnosis_suggestions div");
+            suggestions.forEach(function(suggestion, index) {
+                if (index === selectedIndex) {
+                    suggestion.classList.add('selected');
+                } else {
+                    suggestion.classList.remove('selected');
+                }
+            });
+        }
+    </script>
+    <style>
+        .selected {
+            background-color: #e6e6e6;
+        }
+    </style>
+</body>
+</html>
