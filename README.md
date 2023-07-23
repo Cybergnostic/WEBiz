@@ -9,6 +9,7 @@ Korisnik se loguje
 ![Alt Text](login.png)
 
 i nakon uspešnog logina otvara se glavna strana
+
 ![Alt Text](page.png)
 
 - Polje **Pretraga dijagnoza** omogućava filtriranje i selekciju svih registrovanih dijagnoza.
