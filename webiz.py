@@ -13,7 +13,7 @@ app.secret_key = 'your_secret_key_here'
 # Configuration for the SQLite database
 DATABASE = 'patients.db'
 CSV_FILE = 'dg.csv'
-
+USERS = 'users.db'
 
 
 
@@ -31,7 +31,6 @@ def login():
     if request.method == 'POST':
         username = request.form['username']
         password = request.form['password']
-        print(f"Login form submitted with username: {username} and password: {password}")
 
         # Authenticate user using the authenticate_user function from user_login module
         if user_login.authenticate_user(username, password):
@@ -62,20 +61,14 @@ def index():
     # Fetch the user's data from the database based on the current logged-in user's username
     user_data = None
     if 'username' in session:
-        with user_login.connect_db() as conn:
+        with user_login.connect_db(USERS) as conn:
             try:
                 cursor = conn.cursor()
-                # Print the SQL query before executing it
                 query = "SELECT title, surname, name, speciality FROM users WHERE username = ?"
-                print("SQL Query:", query)
-                
                 cursor.execute(query, (session['username'],))
                 user_data = cursor.fetchone()
             except Exception as e:
                 print(f"Error occurred while fetching user data: {e}")
-
-    # Print the content of the 'user_data' variable
-    print("User Data:", user_data)
 
     # Render the main index page here and pass the user_data to the template as 'user_data'
     return render_template('main_index.html', data=user_data)
@@ -93,10 +86,9 @@ def save_data():
         therapy = request.form['therapy']
         print(patient_surname, patient_name, patient_fathername, patient_birthdate, anamnesis, diagnosis_search, therapy)
         # Save the data to the database
-        with user_login.connect_db() as conn:
+        with user_login.connect_db(DATABASE) as conn:
             cursor = conn.cursor()
-            cursor.execute("INSERT INTO patients (patient_surname, patient_name, patient_fathername, patient_birthdate, anamnesis, diagnosis_search, therapy) VALUES (?, ?, ?, ?, ?, ?, ?)",
-            (patient_surname, patient_name, patient_fathername, patient_birthdate, anamnesis, diagnosis_search, therapy) )
+            cursor.execute("INSERT INTO patients (patient_surname, patient_name, patient_fathername, patient_birthdate, anamnesis, diagnosis_search, therapy) VALUES (?, ?, ?, ?, ?, ?, ?)", (patient_surname, patient_name, patient_fathername, patient_birthdate, anamnesis, diagnosis_search, therapy) )
             conn.commit()
 
         # Return a JSON response indicating success
@@ -129,6 +121,12 @@ def get_suggestions():
     suggestions = suggestions[:10]
     return jsonify(suggestions)
 
-
 if __name__ == '__main__':
-    app.run(host='192.168.100.60', port=777)
+    # Configure the app with the DATABASE path
+    app.config['DATABASE'] = DATABASE
+
+    # Initialize the database
+    user_login.init_db()
+
+    # Run the Flask app
+    app.run(host='10.168.76.104', port=777)

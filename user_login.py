@@ -3,12 +3,12 @@ from flask import session
 import hashlib
 import webiz as w
 
-DATABASE = 'users.db'
+DATA = 'users.db'
 
 
-def connect_db():
+def connect_db(db_file):
     try:
-        return sqlite3.connect(DATABASE)
+        return sqlite3.connect(db_file)
     except sqlite3.Error as e:
         print(f"Error connecting to the database: {e}")
         return None
@@ -19,7 +19,7 @@ def authenticate_user(username, password):
     password_hash = hashlib.sha256(password.encode()).hexdigest()
     print(f"Password hash: {password_hash}")
 
-    with connect_db() as conn:
+    with connect_db(DATA) as conn:
         cursor = conn.cursor()
         cursor.execute("SELECT * FROM users WHERE username = ? AND password = ?", (username, password_hash))
         user = cursor.fetchone()
@@ -32,7 +32,7 @@ def authenticate_user(username, password):
             return False
 
 def init_db():
-    with connect_db() as conn:
+    with connect_db(DATA) as conn:
         cursor = conn.cursor()
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS users (
@@ -56,6 +56,19 @@ def add_user(username, password, title, speciality, name, surname):
     connection.close()
     print(f"User '{username}' has been added to the database.")
         
-        
+
+
+def init_db_scratch(*columns):
+    with connect_db() as conn:
+        cursor = conn.cursor()
+        column_str = ', '.join(f'{col} TEXT NOT NULL' for col in columns)
+        cursor.execute(f'''
+            CREATE TABLE IF NOT EXISTS users (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                {column_str}
+            )
+        ''')
+        conn.commit()
+
 # init_db()
 # add_user("jovke", "car", "prof. dr", "ginekolog", "Jovan", "Veljkovic")
