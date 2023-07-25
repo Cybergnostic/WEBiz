@@ -1,6 +1,5 @@
 import csv
 from flask import Flask, render_template, request, jsonify, session, redirect, url_for
-import sqlite3
 # import os
 import pandas as pd
 import user_login
@@ -11,10 +10,39 @@ app = Flask(__name__)
 app.secret_key = 'your_secret_key_here'
 
 # Configuration for the SQLite database
-DATABASE = 'patients.db'
+DATABASE = 'patients.csv'
 CSV_FILE = 'dg.csv'
-USERS = 'users.db'
+DATA = 'users.csv'
 
+def load_user_data(data_file):
+    # Load user data from the CSV file into a DataFrame
+    try:
+        df = pd.read_csv(data_file, encoding='utf-8')
+        return df
+    except FileNotFoundError:
+        print(f"Error: The '{data_file}' file not found.")
+        return None
+
+def get_user_alias(username):
+    # This function has been updated to fetch 'alias' instead of 'user_alias'
+    with connect_db(DATA) as conn:
+        cursor = conn.cursor()
+        query = "SELECT alias FROM users WHERE username = ?"
+        cursor.execute(query, (username,))
+        result = cursor.fetchone()
+        return result[0] if result else None
+
+def save_data_to_csv(data):
+    # Save the data to the CSV file along with the user's alias
+    with open('patients.csv', 'a', newline='', encoding='utf-8') as csvfile:
+        fieldnames = ['patient_surname', 'patient_name', 'patient_fathername', 'patient_birthdate', 'anamnesis', 'diagnosis_search', 'therapy', 'alias']
+        writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+
+        # Check if the file is empty. If yes, write the header row.
+        if csvfile.tell() == 0:
+            writer.writeheader()
+
+        writer.writerow(data)
 
 
 @app.route('/')
@@ -31,12 +59,12 @@ def login():
     if request.method == 'POST':
         username = request.form['username']
         password = request.form['password']
-
+        session['logged_in'] = "empty"
         # Authenticate user using the authenticate_user function from user_login module
         if user_login.authenticate_user(username, password):
             print("User authenticated successfully.")
             # The user is authenticated, set the 'logged_in' session variable to True
-            session['logged_in'] = True
+            session['logged_in'] = user_login.get_user_alias(username)
             session['username'] = username
             return redirect(url_for('index'))
         else:
@@ -58,21 +86,43 @@ def index():
     if 'logged_in' not in session or not session['logged_in']:
         return redirect(url_for('login_page'))
 
-    # Fetch the user's data from the database based on the current logged-in user's username
-    user_data = None
-    if 'username' in session:
-        with user_login.connect_db(USERS) as conn:
-            try:
-                cursor = conn.cursor()
-                query = "SELECT title, surname, name, speciality FROM users WHERE username = ?"
-                cursor.execute(query, (session['username'],))
-                user_data = cursor.fetchone()
-            except Exception as e:
-                print(f"Error occurred while fetching user data: {e}")
+    # Load user data from the CSV file into a DataFrame
+    df = load_user_data(DATA)
 
-    # Render the main index page here and pass the user_data to the template as 'user_data'
-    return render_template('main_index.html', data=user_data)
-    
+    if df is None:
+        # Handle the case when data cannot be loaded from the CSV file
+        return "An error occurred while loading user data."
+
+    # Fetch the user's data from the DataFrame based on the current logged-in user's alias
+    user_data = None
+    alias = session.get('logged_in')
+    print("Logged-in alias:", alias)
+
+    # Check if the DataFrame is empty or not before accessing its elements
+    if not df.empty:
+        if alias is not None:
+            # Use .loc to filter the DataFrame based on the alias
+            filtered_df = df.loc[df['alias'] == alias]
+            if not filtered_df.empty:
+                user_data = filtered_df.iloc[0].to_dict()
+            else:
+                print("User data not found.")
+        else:
+            print("Alias is None. User not authenticated.")
+    else:
+        print("DataFrame is empty. User data not found.")
+
+    # Fetch the doctor's information
+    doctor_data = {
+        'title': user_data.get('title', ''),
+        'name': user_data.get('name', ''),
+        'surname': user_data.get('surname', ''),
+        'speciality': user_data.get('speciality', '')
+    }
+
+    # Render the main index page here and pass the user_data and doctor_data to the template
+    return render_template('main_index.html', data=user_data, doctor=doctor_data)
+
     
 @app.route('/save', methods=['POST'])
 def save_data():
@@ -84,18 +134,30 @@ def save_data():
         anamnesis = request.form['anamnesis']
         diagnosis_search = request.form['diagnosis_search']
         therapy = request.form['therapy']
-        print(patient_surname, patient_name, patient_fathername, patient_birthdate, anamnesis, diagnosis_search, therapy)
-        # Save the data to the database
-        with user_login.connect_db(DATABASE) as conn:
-            cursor = conn.cursor()
-            cursor.execute("INSERT INTO patients (patient_surname, patient_name, patient_fathername, patient_birthdate, anamnesis, diagnosis_search, therapy) VALUES (?, ?, ?, ?, ?, ?, ?)", (patient_surname, patient_name, patient_fathername, patient_birthdate, anamnesis, diagnosis_search, therapy) )
-            conn.commit()
+
+        # Get the user's alias from the session
+        alias = session.get('logged_in')
+
+        # Save the data to the CSV file along with the user's alias
+        data = {
+            'patient_surname': patient_surname,
+            'patient_name': patient_name,
+            'patient_fathername': patient_fathername,
+            'patient_birthdate': patient_birthdate,
+            'anamnesis': anamnesis,
+            'diagnosis_search': diagnosis_search,
+            'therapy': therapy,
+            'alias': alias,
+        }
+
+        save_data_to_csv(data)
 
         # Return a JSON response indicating success
         return jsonify({"message": "Data saved successfully."})
 
     # If the request method is not POST, return an error response
     return jsonify({"error": "Invalid request method."}), 400
+
 
 
 @app.route('/get_suggestions')
@@ -122,11 +184,6 @@ def get_suggestions():
     return jsonify(suggestions)
 
 if __name__ == '__main__':
-    # Configure the app with the DATABASE path
-    app.config['DATABASE'] = DATABASE
-
-    # Initialize the database
-    user_login.init_db()
 
     # Run the Flask app
-    app.run(host='10.168.76.104', port=777)
+    app.run(host='192.168.100.60', port=777)

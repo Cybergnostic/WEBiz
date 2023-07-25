@@ -231,7 +231,8 @@ if __name__ == "__main__":
                 speciality = input("Enter the speciality: ")
                 name = input("Enter the name: ")
                 surname = input("Enter the surname: ")
-                user_login.add_user(username, password, title, speciality, name, surname)
+                alias = input("Enter the alias: ")
+                user_login.add_user(username, password, title, speciality, name, surname, alias)
             elif choice == 6:
                 break
             else:

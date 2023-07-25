@@ -35,10 +35,10 @@
         <input type="submit" value="Print">
     </form>
     <h5>Doktor:</h5>
-    {% if data %}
-        <p>{{ data[0] }} {{ data[1] }} {{ data[2] }}, {{ data[3] }}</p>
+    {% if doctor %}
+        <p>{{ doctor.title }} {{ doctor.name }} {{ doctor.surname }}, {{ doctor.speciality }}</p>
     {% else %}
-        <p>No user data available</p>
+        <p>No doctor data available</p>
     {% endif %}
     <!-- Logout Form -->
     <form id="logoutForm" method="post" action="{{ url_for('logout') }}">
@@ -63,16 +63,31 @@
 
     async function submitFormAndRedirect() {
         // Save the data to the database using the form's action attribute
-        await fetch($("#saveForm").attr("action"), {
-            method: "POST",
-            body: new FormData(document.getElementById("saveForm"))
-        });
-    
-        // Trigger the print dialog
-        window.print();
-    
-        // Redirect to the main_index page after the form is submitted and printed
-        window.location.href = "{{ url_for('index') }}";
+        const formData = new FormData(document.getElementById("saveForm"));
+
+        try {
+            // Save the data to the CSV file by sending a POST request to the /save route
+            const response = await fetch($("#saveForm").attr("action"), {
+                method: "POST",
+                body: formData,
+            });
+
+            // Check if the data was saved successfully before proceeding
+            if (response.ok) {
+                // Trigger the print dialog
+                window.print();
+
+                // Redirect to the main_index page after the form is submitted and printed
+                window.location.href = "{{ url_for('index') }}";
+            } else {
+                // If there was an error saving the data, display an error message (you can modify this part according to your needs)
+                alert("An error occurred while saving data. Please try again.");
+            }
+        } catch (error) {
+            console.error("Error saving data:", error);
+            // Display an error message if there was an error during the saving process (you can modify this part according to your needs)
+            alert("An error occurred while saving data. Please try again.");
+        }
     }
 
     function clearAllFields() {
@@ -200,7 +215,6 @@
     }
 </script>
 
-    </script>
     <style>
         .selected {
             background-color: #e6e6e6;
